@@ -54,7 +54,7 @@ def parse_args():
 def generate_actual_report():
     print("x")
 
-def generate_historo_report():
+def generate_historico_report():
     print("x")
 
 def main():
@@ -83,9 +83,9 @@ def main():
         save_raw_csv(data, engine)
 
     if args.mode == "historico":
-        pass
+        generate_historico_report()
     elif args.mode == "actual":
-        pass
+        generate_actual_report()
 
 if __name__ == "__main__":
     main()
