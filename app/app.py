@@ -22,13 +22,6 @@ def check_updates(data, engine):
     # Filter out older records
     new_data = new_data[new_data["fecha_carg"] > new_data["latest_fecha"]]
 
-    if not new_data.empty:
-        print(f"{len(new_data)} nuevos registros encontrados")
-        return new_data
-    else:
-        print("No hay nuevos registros")
-        return None
-
 def save_raw_csv(data, engine):
     # conseguir datos
     df = pd.DataFrame(data["results"])
