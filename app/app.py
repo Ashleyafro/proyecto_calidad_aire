@@ -13,6 +13,7 @@ def check_updates(data, engine):
     df_api = pd.DataFrame(data["results"])
     df_api["fecha_carg"] = pd.to_datetime(df_api["fecha_carg"])
 
+    # bajar datos de la bd
     query = "SELECT fecha_carg as latest_fecha FROM cleaned_df"
     latest_db = pd.read_sql(query, engine)
     latest_db_fecha = pd.to_datetime(latest_db["latest_fecha"].iloc[0,0])
@@ -51,7 +52,7 @@ def save_raw_csv(data, engine):
     cleaned_df["fecha_carg"] = cleaned_df["fecha_carg"].dt.strftime("%Y-%m-%dT%H:%M:%S%z")
     safe_timestamp = latest_date.strftime("%Y-%m-%dT%H-%M-%S")
     csv_filepath = os.path.join("./data/raw", f"ultimo_{safe_timestamp}.csv")
-   
+
     try:
             cleaned_df.to_csv(csv_filepath, index=False)
             print(f"CSV guardado en: {csv_filepath}")
@@ -140,24 +141,27 @@ def generate_actual_report():
 
 def generate_historico_report(since, estacion):
     # Get latest csv
-    registro_df = pd.read_csv("./output/historico/registro_historico.csv")
+    historico_df = pd.read_csv("./output/historico/registro_historico.csv")
     # use filters with the given info
     if since:
-        registro_df = registro_df[pd.to_datetime(registro_df["fecha_carg"]) >= pd.to_datetime(since)]
+        since_date = historico_df[pd.to_datetime(since)]
+        historico_df = historico_df[historico_df["fecha_carg"] >= since_date]
     if estacion:
-        registro_df = registro_df[registro_df["fiwareid"] == estacion]
+        historico_df = historico_df[historico_df["fiwareid"] == estacion]
 
+    for station_id in historico_df["fiwareid"].unique():
+        station_data = historico_df[historico_df["fiwareid"] == station_id]
 
-    for station_id in registro_df["fiwareid"].unique():
-        station_data = registro_df[registro_df["fiwareid"] == station_id]
-        plt.plot(pd.to_datetime(station_data["fecha_carg"]), station_data["no2"], label=station_id)
+        plt.plot(pd.to_datetime(station_data["fecha_carg"]), station_data["no2"], label=str(station_id))
 
+    # generate grap
     plt.title("NO2 histórico por estación")
     plt.xlabel("Fecha")
     plt.ylabel("Nivel NO2")
     plt.legend()
     plt.tight_layout()
 
+    # save it 
     output_dir = os.path.join(os.getcwd(), "output", "historico")
     os.makedirs(output_dir, exist_ok=True)
     plt.savefig(os.path.join(output_dir, "NO2_historico.png"))
