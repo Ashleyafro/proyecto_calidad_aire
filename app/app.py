@@ -5,10 +5,11 @@ import os
 import argparse
 import matplotlib.pyplot as plt
 from pathlib import Path
+from docx import Document
 
     
 def check_updates(data, engine):
-    # Convertir resultados del API en DataFrame
+    # Convertir API en DataFrame
     df_api = pd.DataFrame(data["results"])
     df_api["fecha_carg"] = pd.to_datetime(df_api["fecha_carg"])
 
@@ -16,17 +17,22 @@ def check_updates(data, engine):
     latest_db = pd.read_sql(query, engine)
     latest_db_fecha = pd.to_datetime(latest_db["latest_fecha"].iloc[0])
 
-    # Obtener la fecha máxima de los nuevos datos del API
+    # Obtener la fecha max
     latest_api_fecha = df_api["fecha_carg"].max()
 
+    # check if the data in the API has changed
     if latest_api_fecha.equals(latest_db_fecha) != True:
         print("Nuevos datos guardados")
+        # get latest df
         last_df = df_api[df_api["fecha_carg"] > latest_db_fecha]
-        save_raw_csv(last_df)
+        registro_path = "./output/historico/registro_historico.csv"
+        registro_df = pd.read_csv(registro_path)
+        registro_df = pd.concat([registro_df, last_df], ignore_index=True)
+        registro_df.to_csv(registro_path, index=False)
+        save_raw_csv(last_df.to_dict(orient="records"), engine)
     else:
         print("No hay nuevos records")
         return None
-
 
 def save_raw_csv(data, engine):
     # conseguir datos
@@ -44,12 +50,23 @@ def save_raw_csv(data, engine):
     cleaned_df["fecha_carg"] = cleaned_df["fecha_carg"].dt.strftime("%Y-%m-%dT%H:%M:%S%z")
     safe_timestamp = latest_date.strftime("%Y-%m-%dT%H-%M-%S")
     csv_filepath = os.path.join("./data/raw", f"ultimo_{safe_timestamp}.csv")
-
+   
     try:
-        cleaned_df.to_csv(csv_filepath, index=False)
-        print(f"CSV guardado en: {csv_filepath}")
+            cleaned_df.to_csv(csv_filepath, index=False)
+            print(f"CSV guardado en: {csv_filepath}")
     except:
-        print(f"Error al guardar el archivo CSV")
+            print(f"Error al guardar el archivo CSV")
+
+    registro_path = "./output/historico/registro_historico.csv"
+    os.makedirs(os.path.dirname(registro_path), exist_ok=True)
+
+    if os.path.exists(registro_path):
+        registro_df = pd.read_csv(registro_path)
+        registro_df = pd.concat([registro_df, cleaned_df], ignore_index=True)
+    else:
+        registro_df = cleaned_df
+
+    registro_df.to_csv(registro_path, index=False)
 
 def parse_args():
     p = argparse.ArgumentParser(description="Reportes")
@@ -95,32 +112,59 @@ def generate_actual_report():
         os.makedirs(output_dir, exist_ok=True)
 
         summary.to_csv(os.path.join(output_dir, "tabla_actual.csv"))
+
         plt.savefig(os.path.join(output_dir, "no2_por_estacion.png"))
         plt.savefig(os.path.join(output_dir, "pm10_por_estacion.png"))
         plt.savefig(os.path.join(output_dir, "pm25_por_estacion.png"))
+        doc = Document()
+        # Add a title
+        doc.add_heading('Grafica informe actual estacion/no2', level=1)
+        # Add a paragraph
+        doc.add_paragraph('Informe actual sobre el No2 generado según la estación')
+        doc.add_picture("./output/actual/no2_por_estacion.png")
+        doc.add_heading('Grafica informe actual estacion/pm10', level=1)
+        # Add a paragraph
+        doc.add_paragraph('Informe actual sobre el pm10 generado según la estación')
+        # Add the saved plot image to the document
+        doc.add_picture("./output/actual/pm10_por_estacion.png" )
+        # Save the document
+        doc.add_heading('Grafica informe actual estacion/pm25', level=1)
+        # Add a paragraph
+        doc.add_paragraph('Informe actual sobre el pm25 generado según la estación')
+        # Add the saved plot image to the document
+        doc.add_picture("./output/actual/pm25_por_estacion.png")
+
+        save_path = os.path.join(output_dir, "Reporte_Actual.docx")
+        doc.save(save_path)
+        # Save the document
 
         print("Graficos actuales guardados")
 
-def generate_historico_report(since, engine):
-    
+def generate_historico_report(since, estacion):
+    # Get latest csv
+    registro_df = pd.read_csv("./output/historico/registro_historico.csv")
+    # use filters with the given info
     if since:
-        query = f"SELECT * from cleaned_df WHERE fecha_carg >= '{since}' ORDER BY fecha_carg"
-    else:
-        query = f"SELECT * from cleaned_df ORDER BY fecha_carg"
+        registro_df = registro_df[pd.to_datetime(registro_df["fecha_carg"]) >= pd.to_datetime(since)]
+    if estacion:
+        registro_df = registro_df[registro_df["fiwareid"] == estacion]
 
-    historial = pd.read_sql(query, engine)
 
-    for x in historial["fiwareid"].unique():
-        x.plot(kind="line")
-        plt.title("NO2 por estacion")
-        plt.xlabel("Estacion")
-        plt.ylabel("Nivel NO2") 
+    for station_id in registro_df["fiwareid"].unique():
+        station_data = registro_df[registro_df["fiwareid"] == station_id]
+        plt.plot(pd.to_datetime(station_data["fecha_carg"]), station_data["no2"], label=station_id)
+
+    plt.title("NO2 histórico por estación")
+    plt.xlabel("Fecha")
+    plt.ylabel("Nivel NO2")
+    plt.legend()
+    plt.tight_layout()
+
     output_dir = os.path.join(os.getcwd(), "output", "historico")
     os.makedirs(output_dir, exist_ok=True)
     plt.savefig(os.path.join(output_dir, "NO2_historico.png"))
-
+    plt.close()
     print("Graficos historicos guardados")
-
 
 def main():
     args = parse_args()
@@ -144,7 +188,7 @@ def main():
     save_raw_csv(data, engine)
     
     if args.modo == "historico":
-        generate_historico_report(args.since, engine)
+        generate_historico_report(args.since, args.estacion)
     elif args.modo == "actual":
         generate_actual_report()
 
