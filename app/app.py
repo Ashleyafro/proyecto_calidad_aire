@@ -15,7 +15,7 @@ def check_updates(data, engine):
 
     query = "SELECT fecha_carg as latest_fecha FROM cleaned_df"
     latest_db = pd.read_sql(query, engine)
-    latest_db_fecha = pd.to_datetime(latest_db["latest_fecha"].iloc[0])
+    latest_db_fecha = pd.to_datetime(latest_db["latest_fecha"].iloc[0,0])
 
     # Obtener la fecha max
     latest_api_fecha = df_api["fecha_carg"].max()
@@ -27,7 +27,7 @@ def check_updates(data, engine):
         last_df = df_api[df_api["fecha_carg"] > latest_db_fecha]
         registro_path = "./output/historico/registro_historico.csv"
         registro_df = pd.read_csv(registro_path)
-        registro_df = pd.concat([registro_df, last_df], ignore_index=True)
+        registro_df = latest_db.to_sql('clean_df',con = engine,if_exists = 'append',index = False)
         registro_df.to_csv(registro_path, index=False)
         save_raw_csv(last_df.to_dict(orient="records"), engine)
     else:
@@ -38,6 +38,7 @@ def save_raw_csv(data, engine):
     # conseguir datos
     df = pd.DataFrame(data["results"])
     cleaned_df = pd.DataFrame(df[["objectid", "nombre", "direccion", "tipozona", "no2", "pm10", "pm25", "tipoemisio", "fecha_carg", "calidad_am", "fiwareid"]])
+    cleaned_df = cleaned_df[cleaned_df.objectid != 22]
     cleaned_df["fecha_carg"] = pd.to_datetime(cleaned_df["fecha_carg"], format="%Y-%m-%dT%H:%M:%S%z")
 
     # Save in PostgreSQL
@@ -57,16 +58,13 @@ def save_raw_csv(data, engine):
     except:
             print(f"Error al guardar el archivo CSV")
 
-    registro_path = "./output/historico/registro_historico.csv"
-    os.makedirs(os.path.dirname(registro_path), exist_ok=True)
-
-    if os.path.exists(registro_path):
-        registro_df = pd.read_csv(registro_path)
-        registro_df = pd.concat([registro_df, cleaned_df], ignore_index=True)
-    else:
-        registro_df = cleaned_df
-
-    registro_df.to_csv(registro_path, index=False)
+    # get path for registro
+    file = "./output/historico/registro_historico.csv"
+    if (os.path.exists(file) and os.path.isfile(file)):
+        os.remove(file)
+        registro_path = "./output/historico/registro_historico.csv"
+        registro_df = pd.read_sql("SELECT * FROM cleaned_df", engine)
+        registro_df.to_csv(registro_path, index=False)
 
 def parse_args():
     p = argparse.ArgumentParser(description="Reportes")
