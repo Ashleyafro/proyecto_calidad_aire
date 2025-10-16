@@ -1,4 +1,6 @@
 ## Proyecto sobre calidad del aire en Valencia
+
+![Raimundo][imagen/raimundo.jpg]
  
 Este proyecto automatiza la ingesta, limpieza y análisis de datos de calidad del aire obtenidos desde la API de OpenData Valencia
 .
@@ -114,3 +116,4 @@ El script elimina el archivo registro_historico.csv y lo reemplaza tras cada eje
 Los gráficos se guardan automáticamente en las carpetas output/actual y output/historico.
 
 Si no existen datos nuevos en la API, el script notificará "No hay nuevos records".
+
