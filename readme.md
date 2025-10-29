@@ -1,6 +1,6 @@
 ## Proyecto sobre calidad del aire en Valencia
 
-![Raimundo](image.png)
+![raimundo](image.png)
  
 Este proyecto automatiza la ingesta, limpieza y análisis de datos de calidad del aire obtenidos desde la API de OpenData Valencia
 .
